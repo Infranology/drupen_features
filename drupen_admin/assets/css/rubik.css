@@ -1,0 +1,18 @@
+/**
+ * Rubik by default hides the form fields' description tooltip for the input
+ * formats radio. We like them!
+ */
+body div#page .filter-options .form-item .description {
+  background: url('../images/inverted-popup.png') left top no-repeat;
+}
+
+body div#page .filter-options .form-item .description {
+  border-top: 0;
+  border-bottom: 1px solid #D8E4E0;
+  margin: 0;
+  padding: 20px 10px 9px;
+  left: 0;
+  bottom: inherit;
+}
+
+body div#page .filter-options .form-item:hover > .description { display: block; }

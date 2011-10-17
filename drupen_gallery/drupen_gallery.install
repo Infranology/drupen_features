@@ -1,0 +1,64 @@
+<?php
+
+/**
+ * @file
+ * Drüpen Gallery install tasks.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function drupen_gallery_install() {
+  drupal_load('module', 'drupen');
+
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.content');
+  module_load_include('inc', 'drupen_gallery', 'includes/drupen_gallery.user');
+
+  // Configures the roles' permissions.
+  _drupen_gallery_user_configure();
+
+  // Configures the drupen_blog variables. Set comments as Read/Write.
+  $variables = drupen_admin_content_get_default_variables('drupen_photo');
+  $variables += drupen_admin_content_get_default_variables('drupen_gallery');
+
+  // Does not use revision.
+  unset(
+    $variables['node_options_drupen_photo']['1'],
+    $variables['node_options_drupen_gallery']['1']
+  );
+
+  // Excludes drupen_photo from XMLSitemap.
+  $variables['xmlsitemap_settings_node_drupen_photo']['status'] = 0;
+
+  // Makes gallery's photo slide appear before the node reference URL.
+  // NOTE: 'drupen_gallery_photo_node_content_2' can breaks if view/display name changes.
+  $variables['content_extra_weights_drupen_photo']['drupen_gallery_photo_node_content_2'] = -6;
+  $variables['content_extra_weights_drupen_gallery']['drupen_gallery_photo_node_content_3'] = -10;
+
+  // Content fields weights.
+  $content_fields = array(
+    array('field_drupen_photo_file', 'drupen_photo', -8),        // Photo
+    array('field_drupen_photo_description', 'drupen_photo', -7), // Description
+    array('field_drupen_photo_gallery', 'drupen_photo', -5),     // Nodereference
+  );
+
+  $sql = "UPDATE {content_node_field_instance} SET weight = '%d' WHERE field_name = '%s' AND type_name = '%s'";
+  foreach ($content_fields as $content_field) {
+    db_query($sql, $content_field[2], $content_field[0], $content_field[1]);
+  }
+
+  // Collapse revision field.
+  $variables['nodeformscols_field_placements_drupen_photo_default']['revision_information']['collapsed'] = 1;
+  $variables['nodeformscols_field_placements_drupen_gallery_default']['revision_information']['collapsed'] = 1;
+
+  // Add vocabulary tag to the drupen_photo and drupen_photo_gallery node types.
+  drupen_taxonomy_add_vocabulary_node_type('drupen_tag', 'drupen_photo');
+  drupen_taxonomy_add_vocabulary_node_type('drupen_tag', 'drupen_gallery');
+
+  foreach ($variables as $name => $value) {
+    variable_set($name, $value);
+  }
+
+  // Post info.
+  drupen_admin_content_post_info('drupen_photo', FALSE);
+}

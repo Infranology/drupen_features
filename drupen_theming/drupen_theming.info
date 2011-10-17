@@ -1,0 +1,6 @@
+core = "6.x"
+description = "Provides and implements theme utilities."
+name = "Drüpen Theming"
+package = "Drüpen"
+php = "5.2.4"
+project = "drupen_theming"

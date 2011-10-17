@@ -1,0 +1,8 @@
+core = "6.x"
+dependencies[] = "l10n_update"
+dependencies[] = "update"
+description = "Checks Drüpen Features modules updates."
+name = "Drüpen Update"
+package = "Drüpen"
+php = "5.2.4"
+project = "drupen_update"

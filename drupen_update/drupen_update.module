@@ -1,0 +1,57 @@
+<?php
+
+// The Drüpen Features meta package version.
+define('DRUPEN_FEATURES_VERSION', '6.x-1.0');
+
+// Localization server name.
+define('DRUPEN_L10N_SERVER_NAME', 'Translate Drüpen');
+
+// Localization server URL.
+define('DRUPEN_L10N_SERVER_URL', 'http://translate.drupen.org/l10n_server.xml');
+
+// Release history (update status) URL.
+define('DRUPEN_RELEASE_HISTORY_URL', 'http://dev.infranology.com.br/fserver');
+
+/**
+ * Implementation of hook_update_projects_alter().
+ */
+function drupen_update_update_projects_alter(&$projects) {
+  // We don't have separated translations for each Feature module. We unset
+  // them and provide a meta "drupen_features" project.
+  unset(
+    $projects['drupen'],
+    $projects['drupen_admin'],
+    $projects['drupen_blog'],
+    $projects['drupen_gallery'],
+    $projects['drupen_news'],
+    $projects['drupen_profile'],
+    $projects['drupen_theming'],
+    $projects['drupen_update']
+  );
+
+  // Our meta package.
+  $projects['drupen_features'] = array(
+    'name' => 'drupen_features',
+    'description' => t('A meta package that contains all the Drüpen Features modules.'),
+    'info' => array(
+      'core'               => '6.x',
+      'l10n server'        => variable_get('drupen_l10n_server_name', DRUPEN_L10N_SERVER_NAME),
+      'l10n url'           => variable_get('drupen_l10n_server_url', DRUPEN_L10N_SERVER_URL),
+      'name'               => 'Drüpen Features',
+      'project status url' => variable_get('drupen_release_history_url', DRUPEN_RELEASE_HISTORY_URL),
+      'version'            => variable_get('drupen_features_version', DRUPEN_FEATURES_VERSION),
+    ),
+    'includes' => array(
+      'drupen'         => 'Drüpen',
+      'drupen_admin'   => 'Drüpen Admin',
+      'drupen_blog'    => 'Drüpen Blog',
+      'drupen_gallery' => 'Drüpen Gallery',
+      'drupen_news'    => 'Drüpen News',
+      'drupen_profile' => 'Drüpen Profile',
+      'drupen_theming' => 'Drüpen Theming',
+      'drupen_update'  => 'Drüpen Update',
+    ),
+    'project' => 'drupen_features',
+    'project_type' => 'module',
+  );
+}

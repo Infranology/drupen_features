@@ -1,0 +1,68 @@
+<?php
+
+/**
+ * @file
+ * Drüpen Profile install tasks.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function drupen_profile_install() {
+  drupal_load('module', 'drupen');
+
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.content');
+  module_load_include('inc', 'drupen_profile', 'includes/drupen_profile.user');
+
+  // Configures the roles' permissions.
+  _drupen_profile_user_configure();
+
+  // User module variables.
+  $variables = array(
+    'user_picture_dimensions' => '80x80',
+    'user_picture_file_size'  => 256,
+    'user_picture_path'       => 'drupen_profile',
+    'user_pictures'           => 1,
+  );
+
+  // Content Profile variables for drupen_profile.
+  $variables += array(
+    'content_profile_drupen_profile' => array(
+      'weight'       => 0,
+      'user_display' => 0,
+      'edit_link'    => 0,
+      'edit_tab'     => 'top',
+      'add_link'     => 0,
+    ),
+    'content_profile_use_drupen_profile' => 1,
+  );
+
+  // Configures the drupen_profile variables.
+  $variables += drupen_admin_content_get_default_variables('drupen_profile');
+
+  // Don't use scheduling for profile publishing.
+  $variables['scheduler_publish_enable_drupen_profile']   = 0;
+  $variables['scheduler_publish_touch_drupen_profile']    = 0;
+  $variables['scheduler_unpublish_enable_drupen_profile'] = 0;
+
+  foreach ($variables as $name => $value) {
+    variable_set($name, $value);
+  }
+
+  // Post info.
+  drupen_admin_content_post_info('drupen_profile', FALSE);
+
+  // Don't show Services Links widgets.
+  drupen_admin_content_service_links('drupen_profile', FALSE);
+
+  // Creates the directory.
+  $path = file_create_path($variables['user_picture_path']);
+  file_check_directory($path, FILE_CREATE_DIRECTORY);
+
+  // Removes the original profile node type.
+  node_type_delete('profile');
+
+  // Makes heavier since we have a template for a specific view field.
+  // See Views docs for more info in help/views/api-default-views.
+  db_query("UPDATE {system} SET weight = 10 WHERE name = 'drupen_profile'");
+}

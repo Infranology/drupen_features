@@ -1,0 +1,31 @@
+.node p.indent-1, .indent-1 {
+  margin-left: 40px;
+}
+
+.node p.indent-2, .indent-2 {
+  margin-left: 80px;
+}
+
+.node p.indent-3, .indent-3 {
+  margin-left: 120px;
+}
+
+.node p.indent-4, .indent-4 {
+  margin-left: 160px;
+}
+
+.node p.text-left, .text-left {
+  text-align: left;
+}
+
+.node p.text-right, .text-right {
+  text-align: right;
+}
+
+.node p.text-center, .text-center {
+  text-align: center;
+}
+
+.node p.text-justify, .text-justify {
+  text-align: justify;
+}

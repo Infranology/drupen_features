@@ -1,0 +1,104 @@
+<?php
+
+/**
+ * @file
+ * Drüpen install tasks.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function drupen_install() {
+  // The modules' file contains configuration and installation functions that
+  // the others Drüpen modules uses. In a clean install, modules that depends
+  // on those functions must be listed after this module (e.g.: drupen_blog).
+  drupal_load('module', 'drupen');
+
+  module_load_include('inc', 'drupen', 'includes/drupen.better_formats');
+  module_load_include('inc', 'drupen', 'includes/drupen.ckeditor');
+  module_load_include('inc', 'drupen', 'includes/drupen.ckeditor_swf');
+  module_load_include('inc', 'drupen', 'includes/drupen.comment_notify');
+  module_load_include('inc', 'drupen', 'includes/drupen.date_api');
+  module_load_include('inc', 'drupen', 'includes/drupen.filter');
+  module_load_include('inc', 'drupen', 'includes/drupen.imce');
+  module_load_include('inc', 'drupen', 'includes/drupen.nodewords');
+  module_load_include('inc', 'drupen', 'includes/drupen.private_download');
+  module_load_include('inc', 'drupen', 'includes/drupen.search');
+  module_load_include('inc', 'drupen', 'includes/drupen.service_links');
+  module_load_include('inc', 'drupen', 'includes/drupen.system');
+  module_load_include('inc', 'drupen', 'includes/drupen.taxonomy');
+  module_load_include('inc', 'drupen', 'includes/drupen.xmlsitemap');
+  module_load_include('inc', 'drupen', 'includes/drupen.user');
+
+  // Creates the user roles.
+  $roles = _drupen_user_configure();
+
+  // Configures the input formats.
+  _drupen_filter_configure($roles);
+
+  // Configures Better Formats.
+  _drupen_better_formats_configure($roles);
+
+  // Configures IMCE.
+  _drupen_imce_configure($roles);
+
+  // Configures System (Drupal core).
+  _drupen_system_configure();
+
+  // Configures Search (Drupal core).
+  _drupen_search_configure();
+
+  // Configures site vocabularies.
+  _drupen_taxonomy_configure();
+
+  // Configures CKEditor.
+  _drupen_ckeditor_configure();
+
+  // Configures CKEditor SWF.
+  _drupen_ckeditor_swf_configure();
+
+  // Configures Comment notify.
+  _drupen_comment_notify_configure();
+
+  // Configures Date API.
+  _drupen_date_api_configure();
+
+  // Configures Nodewords.
+  _drupen_nodewords_configure();
+
+  // Configures Private Download.
+  _drupen_private_download_configure();
+
+  // Configures Service Links.
+  _drupen_service_links_configure();
+
+  // Configures XMLSitemap.
+  _drupen_xmlsitemap_configure();
+
+  // Indexes 20 nodes per cron run.
+  variable_set('search_cron_limit', '20');
+
+  // Cache settings.
+  variable_set('cache', 1);             // Normal caching module.
+  variable_set('cache_lifetime', 0);    // None minimum cache lifetime.
+  variable_set('preprocess_css', TRUE); // Optimize CSS files.
+  variable_set('preprocess_js', TRUE);  // Optimize JavaScript files.
+
+  // Adds /login as path alias to /user.
+  if (module_exists('path')) {
+    db_query("INSERT INTO {url_alias} (src, dst) VALUES ('%s', '%s')", 'user', 'login');
+  }
+
+  if (module_exists('gravatar')) {
+    variable_set('gravatar_default', 6);  // Use Gravatar logo.
+    variable_set('gravatar_rating', 'G'); // Only images suitable to any audience.
+  }
+
+  // Set support for user pictures in comments.
+  $theme_settings = variable_get('theme_settings', array());
+  $theme_settings['toggle_comment_user_picture'] = TRUE;
+  variable_set('theme_settings', $theme_settings);
+
+  // Makes heavier since we change the default message for new installations.
+  db_query("UPDATE {system} SET weight = 10 WHERE name = 'drupen'");
+}

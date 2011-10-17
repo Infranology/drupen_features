@@ -1,0 +1,4 @@
+# Hide files from the world in Apache.
+<FilesMatch "\.*">
+  Order allow,deny
+</FilesMatch>

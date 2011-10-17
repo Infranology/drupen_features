@@ -1,0 +1,17 @@
+<?php
+
+/**
+ * @file
+ * Drüpen Theming install tasks.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function drupen_theming_install() {
+  // Sets a heavier weight to make. We want the modules' theme implementations
+  // to be the default (theme implementations are cached by
+  // _theme_load_registry(), the last implementation found will be the used,
+  // thus the heavier weight).
+  db_query("UPDATE {system} SET weight = 10 WHERE name = 'drupen_theming'");
+}

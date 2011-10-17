@@ -1,0 +1,138 @@
+<?php
+
+include_once('drupen_admin.features.inc');
+
+/**
+ * Implementation of hook_theme().
+ *
+ * See the Views docs for more info in help/views/api-default-views.
+ */
+function drupen_admin_theme($existing) {
+  return array(
+    // drupen_admin_content view, title field.
+    'views_view_field__drupen_admin_content__title' => array(
+      'arguments'     => array('view' => NULL, 'field' => NULL, 'row' => NULL), // See theme_views_view_field().
+      'template'      => 'views-view-field--drupen-admin-content--title',
+      'original hook' => 'views_view_field',
+      'path'          => drupal_get_path('module', 'drupen_admin') . '/theme',
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_theme_registry_alter().
+ *
+ * Also known as "The Black Art of theme registry manipulation".
+ */
+function drupen_admin_theme_registry_alter(&$theme_registry) {
+  // Replaces the Rubik function. Our theme function does not conflicts with
+  // the Better Formats module.
+  if ($theme_registry['filter_form']['function'] == 'rubik_filter_form') {
+    $module_path = drupal_get_path('module', 'drupen_admin');
+    $theme_registry['filter_form']['function'] = 'drupen_admin_filter_form';
+    $theme_registry['filter_form']['theme path'] = $module_path;
+    $theme_registry['filter_form']['theme paths'] = array($module_path);
+  }
+
+  // Put our preprocess function as the first one to be processed. Then
+  // it will not needed to rebuild the css/js registry with
+  // drupal_get_css/js() after calling drupal_add_css/js().
+  // See http://api.drupal.org/api/drupal/includes--theme.inc/function/template_preprocess_page/6
+  array_unshift($theme_registry['page']['preprocess functions'], 'drupen_admin_preprocess_page');
+}
+
+/**
+ * Implementation of template_preprocess_page().
+ */
+function drupen_admin_preprocess_page(&$variables, $hook) {
+  global $theme;
+
+  // This stylesheet adds better styles for the input formats radios' tooltip.
+  if ('rubik' == $theme) {
+    drupal_add_css(drupal_get_path('module', 'drupen_admin') . '/assets/css/rubik.css');
+  }
+
+  // Any link inside a node form page will open in a new window.
+  drupal_add_js(drupal_get_path('module', 'drupen_admin') . '/assets/js/drupen_admin.js');
+}
+
+/**
+ * The Rubik theme (used as admin theme) provides a theme_filter_form function
+ * to better display the input formats radios. But since it simply concatenate
+ * the themed form with the "Compose tips" link, the permission
+ * "show more format tips link" of Better Formats is not respected.
+ *
+ * Most of the code was copied from the rubik_filter_form() function (it is a
+ * theme function and not an implementation of filter_form() like in Better
+ * Formats), we just added the render call for the formatting help link.
+ *
+ * @param
+ *   A form array.
+ *
+ * @see filter_form()
+ * @see rubik_filter_form()
+ * @see better_formats_filter_form()
+ */
+function drupen_admin_filter_form($form) {
+  if (isset($form['#title'])) {
+    unset($form['#title']);
+  }
+
+  $select = $help = '';
+  foreach (element_children($form) as $key) {
+    // Input formats radio.
+    if (isset($form[$key]['#type']) && $form[$key]['#type'] === 'radio') {
+      $select .= drupal_render($form[$key]);
+    }
+
+    // Formatting help link. Better Formats checks if user has access to it.
+    if (!isset($form[$key]['#type']) && isset($form[$key]['#value'])) {
+      $help = '<div class="filter-help">' . drupal_render($form[$key]) . '</div>';
+    }
+  }
+
+  if (!$select && isset($form['format'])) {
+    $select = drupal_render($form['format']);
+  }
+
+  return "<div class='filter-options clear-block'>{$select}{$help}</div>";
+}
+
+/**
+ * Implementation of hook_node_type().
+ *
+ * It will define the weights for the CCK and Node Form Columns when a new node
+ * type is being saved. This way new node types will have uniformity with the
+ * existing node types.
+ */
+function drupen_admin_node_type($op, $info) {
+  if ($op != 'insert') {
+    return;
+  }
+
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.content');
+
+  $variables = array(
+    'content_extra_weights_%s'                  => drupen_admin_content_get_default_weights(),
+    'nodeformscols_field_placements_%s_default' => drupen_admin_content_get_default_nodeformcols(),
+  );
+
+  // Date Popup Authored variables.
+  $variables += drupen_admin_content_date_popup_authored_variables();
+
+  // Remove the form from Vertical Tabs processing.
+  drupen_admin_content_vertical_tabs($info->type, FALSE, FALSE);
+
+  // Show Service Links widgets.
+  drupen_admin_content_service_links($info->type, TRUE, FALSE);
+
+  foreach ($variables as $name => $value) {
+    $variable_name = sprintf($name, $info->type);
+
+    // Will only save if variable does not exists. This way, programatically
+    // set variables will not be override.
+    if (!variable_get($variable_name, NULL)) {
+      variable_set($variable_name, $value);
+    }
+  }
+}

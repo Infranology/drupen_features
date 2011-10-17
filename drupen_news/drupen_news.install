@@ -1,0 +1,55 @@
+<?php
+
+/**
+ * @file
+ * Drüpen News install tasks.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function drupen_news_install() {
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.content');
+  module_load_include('inc', 'drupen_news', 'includes/drupen_news.user');
+
+  // Configures the roles' permissions.
+  _drupen_news_user_configure();
+
+  // Creates the News categories vocabulary.
+  $vocabularies = array(
+    'drupen_news_category' => array(
+      'name' => t('News categories'),
+      'description' => '',
+      'help' => t('Choose one or more categories where for the news.'),
+      'relations' => '1',
+      'hierarchy' => '1',
+      'multiple' => '1',
+      'required' => '0',
+      'tags' => '0',
+      'module' => 'features_drupen_news_category',
+      'weight' => '-10',
+      'nodes' => array(
+        'drupen_news' => 'drupen_news',
+      ),
+    ),
+  );
+
+  $xmlsitemaps = array(
+    'news_category' => array(
+      'status' => '1',
+      'priority' => '0.7',
+    )
+  );
+
+  drupen_taxonomy_save_vocabulary($vocabularies, $xmlsitemaps);
+
+  // Add vocabulary tag to the drupen_news.
+  drupen_taxonomy_add_vocabulary_node_type('drupen_tag', 'drupen_news');
+
+  // Configures the drupen_news variables.
+  $variables = drupen_admin_content_get_default_variables('drupen_news');
+
+  foreach ($variables as $name => $value) {
+    variable_set($name, $value);
+  }
+}

@@ -1,0 +1,37 @@
+<?php
+
+/**
+ * @file
+ * Drüpen Admin install tasks.
+ */
+
+/**
+ * Implementation hook_install().
+ */
+function drupen_admin_install() {
+  drupal_load('module', 'drupen');
+
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.admin');
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.content');
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.date_popup');
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.user');
+
+  // Configures the Admin module.
+  _drupen_admin_admin_configure();
+
+  // Configures the page and story content types.
+  _drupen_admin_content_configure();
+
+  // Configures the Date Popup module.
+  _drupen_admin_date_popup_configure();
+
+  // Configures the roles' permissions.
+  _drupen_admin_user_configure();
+
+  // Set the default Scheduler date format.
+  variable_set('scheduler_date_format', drupen_language_date_format());
+
+  // Makes heavier since we have a template for a specific view field.
+  // See Views docs for more info in help/views/api-default-views.
+  db_query("UPDATE {system} SET weight = 10 WHERE name = 'drupen_admin'");
+}

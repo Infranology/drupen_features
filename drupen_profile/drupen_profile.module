@@ -1,0 +1,20 @@
+<?php
+
+include_once('drupen_profile.features.inc');
+
+/**
+ * Implementation of hook_theme().
+ *
+ * See the Views docs for more info in help/views/api-default-views.
+ */
+function drupen_profile_theme($existing) {
+  return array(
+    // drupen_profile_author view, title field.
+    'views_view_field__drupen_profile_author__title' => array(
+      'arguments'     => array('view' => NULL, 'field' => NULL, 'row' => NULL), // see theme_views_view_field()
+      'template'      => 'views-view-field--drupen-profile-author--title',
+      'original hook' => 'views_view_field',
+      'path'          => drupal_get_path('module', 'drupen_profile') . '/theme',
+    ),
+  );
+}

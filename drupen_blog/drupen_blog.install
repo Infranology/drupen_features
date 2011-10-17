@@ -1,0 +1,30 @@
+<?php
+
+/**
+ * @file
+ * Drüpen Blog install tasks.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function drupen_blog_install() {
+  drupal_load('module', 'drupen');
+
+  module_load_include('inc', 'drupen_admin', 'includes/drupen_admin.content');
+  module_load_include('inc', 'drupen_blog', 'includes/drupen_blog.user');
+
+  // Configures the roles' permissions.
+  _drupen_blog_user_configure();
+
+  // Configures the drupen_blog variables. Set comments as Read/Write.
+  $variables = drupen_admin_content_get_default_variables('drupen_blog');
+  $variables['comment_drupen_blog'] = 2;
+
+  // Add vocabulary tag to the drupen_blog.
+  drupen_taxonomy_add_vocabulary_node_type('drupen_tag', 'drupen_blog');
+
+  foreach ($variables as $name => $value) {
+    variable_set($name, $value);
+  }
+}

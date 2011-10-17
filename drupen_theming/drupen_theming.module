@@ -1,0 +1,392 @@
+<?php
+
+/**
+ * Implementation of hook_theme().
+ */
+function drupen_theming_theme($existing) {
+  $theme = array();
+
+  $theme['username'] = array(
+    'arguments' => array('object' => NULL),
+    'function'  => 'drupen_theming_username',
+  );
+
+  if (module_exists('imagecache') && module_exists('imagefield')) {
+    foreach (imagecache_presets() as $preset) {
+      $theme['drupen_theming_formatter_' . $preset['presetname'] . '__linked_pager'] = array(
+        'arguments' => array('element' => NULL),
+        'function' => 'theme_drupen_theming_formatter_linked_pager',
+      );
+    }
+
+    foreach (drupen_imagecache_presets_with_vertical() as $preset) {
+      $theme['drupen_theming_formatter_' . $preset['presetname'] . '__vertical'] = array(
+        'arguments' => array('element' => NULL),
+        'function' => 'theme_drupen_theming_formatter_vertical',
+      );
+
+      $theme['drupen_theming_formatter_' . $preset['presetname'] . '__linked_vertical'] = array(
+        'arguments' => array('element' => NULL),
+        'function' => 'theme_drupen_theming_formatter_linked_vertical',
+      );
+
+      $theme['drupen_theming_formatter_' . $preset['presetname'] . '__linked_vertical_pager'] = array(
+        'arguments' => array('element' => NULL),
+        'function' => 'theme_drupen_theming_formatter_linked_pager_vertical',
+      );
+    }
+  }
+
+  return $theme;
+}
+
+/**
+ * Implementation of theme_username().
+ *
+ * Use the content profile node title if available.
+ */
+function drupen_theming_username($object) {
+  global $language;
+
+  if ($object->uid && $object->name) {
+    // Stores the loaded nodes.
+    static $profile_nodes = array();
+
+    $name = $object->name;
+
+    // Use the content profile node title. The content profile node author
+    // must be the same author of the node being displayed.
+    if (module_exists('content_profile') && module_exists('drupen_profile')) {
+      $language_count = variable_get('language_count', 1);
+
+      // Node search parameters.
+      $node_uid      = $object->uid;
+      $node_type     = 'drupen_profile';
+      $node_language = $language_count > 1 ? $language->language : 'en';
+
+      $node_cache_key = sprintf('%d-%s-%s', $node_uid, $node_type, $node_language);
+
+      if (isset($profile_nodes[$node_cache_key])) {
+        $node = $profile_nodes[$node_cache_key];
+      }
+      else {
+        $node = node_load(array(
+          'uid'      => $node_uid,
+          'type'     => $node_type,
+          'language' => $node_language,
+        ));
+      }
+
+      if ($node) {
+        $name = $node->title;
+
+        // Stores in local cache.
+        $profile_nodes[$node_cache_key] = $node;
+      }
+      else {
+        $node = NULL;
+
+        // This prevents more queries.
+        $profile_nodes[$node_cache_key] = FALSE;
+      }
+    }
+
+    // Shorten the name when it is too long or it will break many tables.
+    if (drupal_strlen($name) > 26) {
+      $name = drupal_substr($name, 0, 23) . '...';
+    }
+
+    // Link to the content profile node if published.
+    if (module_exists('content_profile') && isset($node) && $node->status) {
+      $output = l($name, 'node/' . $node->nid, array('attributes' => array('title' => t('View user profile.'))));
+    }
+    // Link to the user page if user has access and content profile node does not exists.
+    elseif (user_access('access user profiles') && !isset($node)) {
+      $output = l($name, 'user/' . $object->uid, array('attributes' => array('title' => t('View user profile.'))));
+    }
+    // Output the plain content profile node title or the user name in last case.
+    else {
+      $output = check_plain($name);
+    }
+  }
+  elseif ($object->name) {
+    // Sometimes modules display content composed by people who are
+    // not registered members of the site (e.g. mailing list or news
+    // aggregator modules). This clause enables modules to display
+    // the true author of the content.
+    if (!empty($object->homepage)) {
+      $output = l($object->name, $object->homepage, array('attributes' => array('rel' => 'nofollow')));
+    }
+    else {
+      $output = check_plain($object->name);
+    }
+
+    $output .= ' ('. t('not verified') .')';
+  }
+  else {
+    $output = check_plain(variable_get('anonymous', t('Anonymous')));
+  }
+
+  return $output;
+}
+
+/**
+ * Implementation of hook_theme_registry_alter().
+ *
+ * Workaround to make the mimemail-message.tpl.php and
+ * simplenews-newsletter-body.tpl.php and  simplenews-newsletter-footer.tpl.php
+ * available to the theme system when a newsletter is sent (in simplenews node
+ * add and edit tasks) with the node editing set to use the admin theme.
+ */
+function drupen_theming_theme_registry_alter(&$theme_registry) {
+  // Adds the /theme path to the block theme paths.
+  $theme_registry['block']['theme paths'][] = drupal_get_path('module', 'drupen_theming') . '/theme';
+
+  if (module_exists('mimemail')) {
+    _drupen_theming_theme_registry_hook($theme_registry, 'mimemail_message');
+  }
+
+  if (module_exists('simplenews')) {
+    _drupen_theming_theme_registry_hook($theme_registry, 'simplenews_newsletter_body');
+    _drupen_theming_theme_registry_hook($theme_registry, 'simplenews_newsletter_footer');
+  }
+}
+
+/**
+ * Implementation of hook_field_formatter_info().
+ */
+function drupen_theming_field_formatter_info() {
+  if (!module_exists('imagecache') || !module_exists('imagefield')) {
+    return array();
+  }
+
+  $formatters = array();
+  foreach (imagecache_presets() as $preset) {
+    $formatters[$preset['presetname'] .'__linked_pager'] = array(
+      'label' => t('Drüpen Theming: @preset linked to node with pager querystring', array('@preset' => $preset['presetname'])),
+      'field types' => array('image', 'filefield'),
+    );
+  }
+
+  foreach (drupen_imagecache_presets_with_vertical() as $preset) {
+    $formatters[$preset['presetname'] .'__vertical'] = array(
+      'label' => t('Drüpen Theming: @preset (can switch to vertical)', array('@preset' => $preset['presetname'])),
+      'field types' => array('image', 'filefield'),
+    );
+
+    $formatters[$preset['presetname'] .'__linked_vertical'] = array(
+      'label' => t('Drüpen Theming: @preset linked to node (can switch to vertical)', array('@preset' => $preset['presetname'])),
+      'field types' => array('image', 'filefield'),
+    );
+
+    $formatters[$preset['presetname'] .'__linked_pager_vertical'] = array(
+      'label' => t('Drüpen Theming: @preset linked to node with pager querystring (can switch to vertical)', array('@preset' => $preset['presetname'])),
+      'field types' => array('image', 'filefield'),
+    );
+  }
+
+  return $formatters;
+}
+
+/**
+ * Helper function to return extra classes set by the user using the Block
+ * Theme interface.
+ *
+ * @param $variable
+ *   The variable name set by the user.
+ *
+ * @param $blocktheme_vars
+ *   The array with the Block Theme variables.
+ *
+ * @param $blocktheme_child_vars
+ *   An array with extra classes to include also.
+ *
+ * @return
+ *   A string with the classes separated by single space of empty string if any
+ *   variable were found inside one of the two variables array.
+ */
+function drupen_theming_blocktheme_classes($variable, array $blocktheme_vars, array $blocktheme_child_vars) {
+  $ret = array();
+
+  $ret[] = isset($blocktheme_vars[$variable]) ?
+    $blocktheme_vars[$variable] : '';
+
+  $ret[] = isset($blocktheme_child_vars[$variable]) ?
+    $blocktheme_child_vars[$variable] : '';
+
+  $ret = trim(check_plain(implode(' ', $ret)));
+
+  if ('' === $ret) {
+    return '';
+  }
+
+  return ' ' . $ret;
+}
+
+/**
+ * Registers a theme hook in the theme registry.
+ *
+ * @param &$theme_registry
+ *   An array reference with the current theme registry data.
+ *
+ * @param $hook
+ *   The hook name to be registered.
+ *
+ * @link
+ *   http://drupal.org/node/374222#comment-3587178 Original code snippet
+ */
+function _drupen_theming_theme_registry_hook(&$theme_registry, $hook) {
+  global $theme;
+
+  $source_theme = variable_get('admin_theme', '');
+  $target_theme = variable_get('theme_default', '');
+
+  if ($source_theme != $target_theme && $theme == $source_theme) {
+    $themes = list_themes();
+    $target_theme = $themes[$target_theme];
+
+    $target_path = dirname($target_theme->filename);
+    $existing = array($hook => array());
+    $engine_callback = $target_theme->engine . '_theme';
+    $templates = $engine_callback($existing, 'theme', $target_theme->name, $target_path);
+
+    if (!empty($templates)) {
+      $path = $templates[$hook]['path'];
+      $theme_registry[$hook]['template'] = basename($theme_registry[$hook]['template']);
+      $theme_registry[$hook]['path'] = $path;
+      $theme_registry[$hook]['theme path'] = $target_path;
+      $theme_registry[$hook]['theme paths'][] = $path;
+      $include_file = $target_path . '/template.php';
+      $preprocess = FALSE;
+
+      if (!in_array($include_file, get_included_files()) && file_exists($include_file)) {
+        include_once $include_file;
+      }
+
+      foreach (array($target_theme->engine, $target_theme->name) as $prefix) {
+        $function = $prefix . '_preprocess_' . $hook;
+
+        if (function_exists($function)) {
+          $preprocess = TRUE;
+          $theme_registry[$hook]['preprocess functions'][] = $function;
+        }
+      }
+
+      if ($preprocess) {
+        $theme_registry[$hook]['include files'][] = $include_file;
+        $theme_registry[$hook]['preprocess functions'] = array_unique($theme_registry[$hook]['preprocess functions']);
+      }
+    }
+  }
+}
+
+/**
+ * @see _theme_drupen_theming_formatter()
+ */
+function theme_drupen_theming_formatter_vertical($element) {
+  return _theme_drupen_theming_formatter($element, TRUE, TRUE);
+}
+
+/**
+ * @see _theme_drupen_theming_formatter_linked()
+ */
+function theme_drupen_theming_formatter_linked_pager($element) {
+  return _theme_drupen_theming_formatter_linked($element, TRUE);
+}
+
+/**
+ * @see _theme_drupen_theming_formatter_linked()
+ */
+function theme_drupen_theming_formatter_linked_vertical($element) {
+  return _theme_drupen_theming_formatter_linked($element, FALSE, TRUE);
+}
+
+/**
+ * @see _theme_drupen_theming_formatter_linked()
+ */
+function theme_drupen_theming_formatter_linked_pager_vertical($element) {
+  return _theme_drupen_theming_formatter_linked($element, TRUE, TRUE);
+}
+
+/**
+ * @param $element
+ *   The image element to be themed.
+ *
+ * @param $use_vertical
+ *   If TRUE, will use the vertical oriented preset (element formatter preset
+ *   name appended with the '_vertical' string).
+ *
+ * @param $return_image
+ *   If TRUE, will return the themed image. By default, returns an array.
+ *
+ * @return
+ *   A formatted linked image (ImageCache processed).
+ *
+ * @see theme_imagecache_formatter_linked().
+ */
+function _theme_drupen_theming_formatter($element, $use_vertical = FALSE, $return_image = FALSE) {
+  // Inside a view $element may contain NULL data. In that case, just return.
+  if (empty($element['#item']['fid'])) {
+    return '';
+  }
+
+  // Extract the preset name from the formatter name.
+  $presetname = substr($element['#formatter'], 0, strrpos($element['#formatter'], '__'));
+  $style = 'linked';
+
+  $item = $element['#item'];
+  $item['data']['alt'] = isset($item['data']['alt']) ? $item['data']['alt'] : '';
+  $item['data']['title'] = isset($item['data']['title']) ? $item['data']['title'] : NULL;
+
+  // Is Image vertically orientation?
+  if ($use_vertical && ($item['data']['width'] < $item['data']['height'])) {
+    $presetname .= '_vertical';
+  }
+
+  $imagetag = theme('imagecache', $presetname, $item['filepath'], $item['data']['alt'], $item['data']['title']);
+
+  if ($return_image) {
+    return $imagetag;
+  }
+
+  return array(
+    $imagetag,
+    $item,
+    $presetname,
+    $style
+  );
+}
+
+/**
+ * @param $element
+ *   The image element to be themed.
+ *
+ * @param $pager_querystring
+ *   If TRUE, append the 'page' querystring if available in the current URL.
+ *
+ * @param $use_vertical
+ *   If TRUE, will use the vertical oriented preset (element formatter preset
+ *   name appended with the '_vertical' string).
+ *
+ * @return
+ *   A formatted linked image (ImageCache processed).
+ *
+ * @see theme_imagecache_formatter_linked().
+ */
+function _theme_drupen_theming_formatter_linked($element, $pager_querystring = FALSE, $use_vertical = FALSE) {
+  $query = array();
+
+  // Add the pager querystring if available?
+  if ($pager_querystring && ($page = isset($_GET['page']) ? $_GET['page'] : '')) {
+    $query = drupal_query_string_encode(array('page' => $page));
+  }
+
+  list(
+    $imagetag, $item, $presetname, $style
+  ) = _theme_drupen_theming_formatter($element, $use_vertical);
+
+  $path = empty($item['nid']) ? '' : 'node/'. $item['nid'];
+  $class = "imagecache imagecache-$presetname imagecache-$style imagecache-{$element['#formatter']}";
+
+  return l($imagetag, $path, array('attributes' => array('class' => $class), 'query' => $query, 'html' => TRUE));
+}

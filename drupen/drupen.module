@@ -1,0 +1,579 @@
+<?php
+
+/**
+ * @file
+ * Drüpen utilities functions.
+ */
+
+/**
+ * Implementation of hook_init().
+ */
+function drupen_init() {
+  drupal_add_css(drupal_get_path('module', 'drupen') . '/assets/css/drupen-layout.css');
+  drupal_add_css(drupal_get_path('module', 'drupen') . '/assets/css/drupen-text.css');
+
+  // Add the Zen NineSixty CSS for basic text styles.
+  // The CKEditor CSS file always includes this one.
+  if (!module_exists('zen_ninesixty')) {
+    drupal_add_css(drupal_get_path('module', 'drupen') . '/assets/css/zen_ninesixty-text.css');
+  }
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function drupen_menu() {
+  // HACK: when installing a Features' module that exports a node type, the
+  // permissions for the node type will not be available in the time
+  // hook_install() executes. This is true when installing through an install
+  // profile. We take advantage that menu_rebuild() after a sucessfull
+  // installation to rebuild the permissions using our custom API logic. This
+  // way the permissions for Features' exported node types are persisted.
+  if (!variable_get('drupen_permissions_rebuild_time', NULL)) {
+    _drupen_rebuild_permissions();
+    variable_set('drupen_permissions_rebuild_time', time());
+  }
+
+  return array(
+    'node' => array(
+      'title' => 'Content',
+      'page callback' => 'drupen_page_default',
+      'access arguments' => array('access content'),
+      'type' => MENU_CALLBACK,
+    )
+  );
+}
+
+/**
+ * Overrides the node_page_default() function, displaying a different welcome
+ * message for a recently installed Drüpen website.
+ *
+ * @see node_page_default()
+ */
+function drupen_page_default() {
+  $output = node_page_default();
+
+  if (1 === preg_match('/^<div id="first\-time"><h1 class="title">/', $output)) {
+    $default_message = array();
+
+    $links = array(
+      array('@content' => 'node/add'),
+      array(
+        '@drupen'         => 'http://drupen.org',
+        '@drupal'         => 'http://drupal.org',
+        '@drupen-docs'    => 'http://drupen.org/documentation',
+        '@drupal-docs'    => 'http://drupal.org/documentation',
+        '@drupal-forum'   => 'http://drupal.org/forum',
+        '@drupal-support' => 'http://drupal.org/support',
+      ),
+      array(
+        '@admin'          => 'admin',
+        '@modules'        => 'admin/build/modules',
+        '@themes'         => 'admin/build/themes',
+        '@drupal-modules' => 'http://drupal.org/project/modules',
+        '@drupal-themes'  => 'http://drupal.org/project/themes',
+      ),
+    );
+
+    $default_message[] = '<h1 class="title">' . t('Welcome to your new Drüpen website!') . '</h1>';
+    $default_message[] = '<p>' . t('Here are some hints to start using your website:') . '</p>';
+    $default_message[] = '<ol>';
+
+    $default_message[] = '<li>' . t('<strong>Post content</strong>You can easily <a href="@content">create content</a> with Drüpen. Let your site audience up to date with posts from your blog and/or with news, let it see the photos you took in a travel or during an event. Embed videos from YouTube or other video sites or start your podcast uploading mp3 files.', $links[0]) . '</li>';
+    $default_message[] = '<li>' . t('<strong>Help</strong>You can find usage and development documentation in the <a href="@drupen-docs">Drüpen documentation</a>. Since <a href="@drupen">Drüpen</a> is a <a href="@drupal">Drupal</a> distribution, you can also find valuable information in the <a href="@drupal-docs">Drupal documentation</a>. The Drupal project site also have a <a href="@drupal-forum">forum</a> and <a href="@drupal-support">other support options</a> where you can post questions or share thoughts.', $links[1]) . '</li>';
+    $default_message[] = '<li>' . t('<strong>Configure your website</strong>You can configure and customize your website in the <a href="@admin">administration section</a>. You can also enable features installing <a href="@modules">additional modules</a> or change the "look and feel" of your website in the <a href="@themes">themes section</a>. Refer to the Drupal project site to download additional <a href="@drupal-modules">modules</a> or <a href="@drupal-themes">themes</a>.', $links[2]) . '</li>';
+
+    $default_message[] = '</ol>';
+    $default_message[] = '<p>'. t('This welcome message will disappear once you have promoted a post to the front page.') .'</p>';
+
+    $output = '<div id="first-time">'. implode('', $default_message) .'</div>';
+  }
+
+  return $output;
+}
+
+/**
+ * Loads a node using the node id available in the URL.
+ *
+ * @return
+ *   A node object or NULL when the URL is not a node/id or the node with the
+ *   id does not exists.
+ */
+function drupen_load_node_from_url() {
+  if ($nid = drupen_get_nid_from_url()) {
+    return node_load($nid);
+  }
+
+  return NULL;
+}
+
+/**
+ * Returns the node id available in the URL.
+ *
+ * @return
+ *   A node id or NULL when the URL is not a node/id page.
+ */
+function drupen_get_nid_from_url() {
+  if (drupen_is_node_page()) {
+    return arg(1);
+  }
+
+  return NULL;
+}
+
+/**
+ * Check if the page URL is a node/id path.
+ *
+ * @return
+ *   TRUE on success, FALSE otherwise.
+ */
+function drupen_is_node_page() {
+  if (arg(0) == 'node') {
+    $nid = arg(1);
+
+    if (is_numeric($nid)) {
+      return TRUE;
+    }
+  }
+
+  return FALSE;
+}
+
+/**
+ * Returns the base URL path, without the slash ("/") prefix. If the path is
+ * different than "/", it will return the path appended with "/". Examples:
+ *
+ * Root URL: http://www.example.com
+ * drupen_base_path() returns ''
+ *
+ * Root URL: http://www.example.com/drupen
+ * drupen_base_path() returns 'drupen/'
+ *
+ * @return
+ *   The base path without the slash prefix.
+ */
+function drupen_base_path() {
+  $ret = '';
+
+  $base_path = base_path();
+  if ('/' != $base_path && 0 === strpos($base_path, '/')) {
+    $ret = substr($base_path, 1) . '/';
+  }
+
+  return $ret;
+}
+
+/**
+ * Save permissions for roles.
+ *
+ * @param $permissions
+ *   An associative array in the form permission name => array(roles).
+ *
+ * @see drupen_user_save_role_permissions()
+ */
+function drupen_user_save_permissions_roles(array $permissions) {
+  $roles_permissions = array();
+
+  foreach ($permissions as $permission => $roles) {
+    foreach ($roles as $role) {
+      $roles_permissions[$role][] = $permission;
+    }
+  }
+
+  foreach ($roles_permissions as $role => $permissions) {
+    drupen_user_save_role_permissions($role, $permissions);
+  }
+}
+
+/**
+ * Save permissions for a role. It filters the passed permissions with the
+ * permissions exposed by the enabled modules, applying only permissions that
+ * exists and that the role does not have.
+ *
+ * @param $role
+ *   The role name.
+ *
+ * @param $permissions
+ *   An array of permissions names.
+ */
+function drupen_user_save_role_permissions($role, array $permissions) {
+  static $modules_permissions = array();
+
+  // Get the role id. Only set permissions if role exists.
+  $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", $role));
+
+  if (FALSE === $rid || 0 == count($permissions)) {
+    return FALSE;
+  }
+
+  // Get the permissions from enabled modules.
+  if (0 === count($modules_permissions)) {
+    foreach (module_list(FALSE, FALSE, TRUE) as $module) {
+      if ($module_permissions = module_invoke($module, 'perm')) {
+        $modules_permissions = array_merge($modules_permissions, $module_permissions);
+      }
+    }
+  }
+
+  // Filters the permissions, only persists if passed permissions exists.
+  $permissions = array_intersect($permissions, $modules_permissions);
+
+  if (0 === count($permissions)) {
+    return FALSE;
+  }
+
+  // Get the role's permissions.
+  $role_permissions = db_result(db_query("SELECT perm FROM {permission} WHERE rid = %d", $rid));
+
+  if (!empty($role_permissions)) {
+    $role_permissions = explode(', ', $role_permissions);
+  }
+  else {
+    $role_permissions = array();
+  }
+
+  // Check if permissions are already set. Only persists new permissions.
+  $diff = array_diff($permissions, $role_permissions);
+
+  if (0 == count($diff)) {
+    return FALSE;
+  }
+
+  $role_permissions = array_merge($role_permissions, $diff);
+
+  // If merged permissions are equal to the filtered passed permissions, it's a
+  // new role without permissions set yet.
+  if (array_values($role_permissions) === array_values($diff)) {
+    db_query("INSERT INTO {permission} (rid, perm) VALUES (%d, '%s')", $rid, implode(', ', $role_permissions));
+  }
+  else {
+    db_query("UPDATE {permission} SET perm = '%s' WHERE rid = %d", implode(', ', $role_permissions), $rid);
+  }
+
+  return TRUE;
+}
+
+/**
+ * Helper function to save array variables that references node types. It's
+ * common to use array variables in Drupal, like the 'theme_settings' array to
+ * toogle the node post info in the node view:
+ *
+ * @code
+ *   print_r(variable_get('theme_settings'))
+ *   Array
+ *   (
+ *     [toggle_comment_user_picture] => 1
+ *     [toggle_node_info_page] =>           // Don't show post info.
+ *     [toggle_node_info_story] => 1        // Show post info.
+ *   )
+ * @endcode
+ *
+ * This function easy the manipulation of this kind of variable. Just pass the
+ * node type you want to toogle, the variable name and an array of options.
+ *
+ * @code
+ *   // prefix with 'toogle_node_info_'
+ *   drupen_variable_set_array_node_types('page', 'theme_settings', array('key_value' => 'toogle_node_info_'));
+ *
+ *   // sufix with '_node_form'
+ *   drupen_variable_set_array_node_types('page', 'vertical_tabs', array('key_value' => '_node_form', 'use_node_type' => TRUE));
+ * @endcode
+ *
+ * The above code will set the key 'toogle_node_info_page' with a TRUE value in
+ * the 'theme_settings' variable. If the value of a key must be the node type
+ * name, set the option 'use_node_type' to TRUE:
+ *
+ * @code
+ *   drupen_variable_set_array_node_types('page', 'service_links_node_types', array('use_node_type' => TRUE));
+ * @endcode
+ *
+ * @param $node_types
+ *   A node type name or an array of node types names.
+ *
+ * @param $variable_name
+ *   The variable name.
+ *
+ * @param $options
+ *   An associative array of options. Possible options are:
+ *   - toogle: The Boolean value to set. Defaults to TRUE.
+ *
+ *   - use_node_type: If TRUE and 'toogle' is TRUE, use the node type as value.
+ *     Defaults to FALSE.
+ *
+ *   - key: The prefix or sufix for the node type key. If the value begins with
+ *     "_" (underscore), it will use it as a suffix. Defaults to ''.
+ *
+ *   - override: If the node type key already exists, it will override the
+ *     value. Defaults to TRUE.
+ *
+ * @return
+ *   The new variable value.
+ */
+function drupen_variable_node_types_set($node_types, $variable_name, array $options = array()) {
+  static $default_options = array(
+    'toogle'        => TRUE,
+    'use_node_type' => FALSE,
+    'key_value'     => '',
+    'override'      => TRUE,
+  );
+
+  $options = array_merge($default_options, $options);
+
+  // Options values.
+  $toogle        = $options['toogle'];
+  $use_node_type = $options['use_node_type'];
+  $key_value     = $options['key_value'];
+  $override      = $options['override'];
+
+  // Set the key position.
+  $key_pos = (!empty($key_value) && 0 === strpos($key_value, '_')) ?
+    'suffix' : 'prefix';
+
+  if (!is_array($node_types)) {
+    $node_types = (array) $node_types;
+  }
+
+  $variable_value = variable_get($variable_name, array());
+
+  foreach ($node_types as $node_type) {
+    $value = $toogle;
+
+    if ($toogle) {
+      $value = $use_node_type ? $node_type : $toogle;
+    }
+
+    // Set the key value.
+    $key = ('prefix' === $key_pos) ?
+      $key_value . $node_type :
+      $node_type . $key_value;
+
+    // Override variable if applicable.
+    if (isset($variable_value[$key]) && $override) {
+      $variable_value[$key] = $value;
+      continue;
+    }
+
+    // If not exists, add the node type key to the array.
+    if (!isset($variable_value[$key])) {
+      $variable_value[$key] = $value;
+    }
+  }
+
+  variable_set($variable_name, $variable_value);
+
+  return $variable_value;
+}
+
+/**
+ * Helper to update variables that can already exists in the variable table.
+ * It will update the variable if the value is equal or NULL. If you want to
+ * override with a new value but only if the value is specific, pass a keyed
+ * array with the "original" and "update" keys:
+ *
+ * @code
+ * $variables array(
+ *   'my_variable' => array(
+ *     'original' => 1,
+ *     'update'   => 2
+ *   )
+ * );
+ * @endcode
+ *
+ * @param
+ *   An associative array of variables to update.
+ *
+ * @return
+ *   Return an array formatted for hook_update_N() reporting.
+ */
+function drupen_variable_update(array $variables) {
+  $updated = array();
+  $not_updated = array();
+
+  foreach ($variables as $key => $value) {
+    $actual = variable_get($key, NULL);
+
+    $compare = $value;
+    if (is_array($value) && isset($value['original']) && isset($value['update'])) {
+      $compare = $value['original'];
+      $value = $value['update'];
+    }
+
+    if ($compare === $actual || NULL === $actual) {
+      variable_set($key, $value);
+      $updated[$key] = $value;
+      continue;
+    }
+
+    $not_updated[$key] = $value;
+  }
+
+  $ret = array();
+  foreach ($updated as $key => $value) {
+    $ret[] = array(
+      'success' => TRUE,
+      'query' => sprintf(
+        'Updated the "%s" variable (to value: %s).',
+        $key, !is_scalar($value) ? serialize($value) : $value
+      )
+    );
+  }
+
+  foreach ($not_updated as $key => $value) {
+    $ret[] = array(
+      'success' => FALSE,
+      'query' => sprintf(
+        'Tried to update the "%s" variable. Failed because the value was not equal to the expected or was not NULL.',
+        $key
+      )
+    );
+  }
+
+  return $ret;
+}
+
+/**
+ * A replacement for taxonomy_features_rebuild(). It saves/updates a vocabulary
+ * array definition and a xmlsitemap setting for the specified vocabularies
+ * (if xmlsitemap_taxonomy module exists).
+ *
+ * @param
+ *   An array of vocabularies definitions, keyed by vocabulary machine name.
+ *
+ * @param
+ *   An array of xmlsitemap settings for the vocabularies, keyed by vocabulary
+ *   machine name.
+ *
+ * @link http://drupalcontrib.org/api/drupal/contributions--features--includes--features.taxonomy.inc/function/taxonomy_features_rebuild/6
+ */
+function drupen_taxonomy_save_vocabulary(array $vocabularies, array $xmlsitemaps = array()) {
+  foreach ($vocabularies as $machine_name => $vocabulary) {
+    if ($vid = db_result(db_query("SELECT vid FROM {vocabulary} WHERE module = '%s'", 'features_' . $machine_name))) {
+      $vocabulary['vid'] = $vid;
+    }
+
+    // TODO: if already exists, could just call drupen_taxonomy_add_vocabulary_node_type
+    // for the 'nodes' entry.
+    taxonomy_save_vocabulary($vocabulary);
+
+    if (module_exists('xmlsitemap_taxonomy') && isset($xmlsitemaps[$machine_name])) {
+      variable_set('xmlsitemap_settings_taxonomy_term_' . $vocabulary['vid'], $xmlsitemaps[$machine_name]);
+    }
+  }
+}
+
+/**
+ * Add a node type to a vocabulary.
+ *
+ * @param
+ *   The machine name of the vocabulary
+ *
+ * @param
+ *   The node type name
+ */
+function drupen_taxonomy_add_vocabulary_node_type($machine_name, $type) {
+  $vocabularies = taxonomy_get_vocabularies();
+
+  foreach ($vocabularies as $vocabulary) {
+    if ('features_' . $machine_name === $vocabulary->module && !isset($vocabulary->nodes[$type])) {
+      $vocabulary->nodes[$type] = $type;
+      $vocabulary = (array) $vocabulary;
+
+      return taxonomy_save_vocabulary($vocabulary);
+    }
+  }
+}
+
+/**
+ * Returns a date format for a language.
+ *
+ * @param $type
+ *   The date format type. Can be one of: long, medium or short.
+ *   Optional, defaults to short.
+ *
+ * @param $language
+ *   The desired language object. Optional, defaults to site default language.
+ *
+ * @return
+ *   A date format string. If none was found, returns the value of
+ *   'date_format_<TYPE>' variable or 'm/d/Y H:i' if variable is NULL.
+ */
+function drupen_language_date_format($type = 'short', $language = NULL) {
+  if (NULL === $language) {
+    $language = language_default();
+  }
+
+  $format = db_result(db_query(
+    "SELECT format FROM {date_format_locale} WHERE language = '%s' AND type = '%s'",
+    $language->language, $type
+  ));
+
+  return FALSE !== $format ?
+    $format :
+    variable_get('date_format_' . $type, 'm/d/Y H:i');
+}
+
+/**
+ * Returns an array of ImageCache presets that have a counterpart preset
+ * suffixed with '_vertical'.
+ *
+ * @return
+ *   Array of ImageCache presets of FALSE if module is not available.
+ */
+function drupen_imagecache_presets_with_vertical() {
+  if (!module_exists('imagecache')) {
+    return FALSE;
+  }
+
+  $vertical_presets = array();
+
+  $imagecache_presets = imagecache_presets();
+  $presets = array();
+
+  foreach ($imagecache_presets as $preset) {
+    $presets[$preset['presetname']] = $preset;
+  }
+
+  foreach ($presets as $preset) {
+    $presetname = $preset['presetname'];
+    $vertical_presetname = $presetname . '_vertical';
+
+    if (0 === preg_match('/_vertical$/', $presetname) && isset($presets[$vertical_presetname])) {
+      $vertical_presets[$presetname] = $preset;
+    }
+  }
+
+  return $vertical_presets;
+}
+
+/**
+ * Search for include files in the form module_name.user_permission.inc and
+ * load then if the module exists. After that, updates the permissions using
+ * the array of permissions/roles returned by the function
+ * module_user_permissions().
+ *
+ * NOTE: This is internal, calling it could revert permissions that was
+ * disabled for an user.
+ *
+ * @see drupen_menu()
+ */
+function _drupen_rebuild_permissions() {
+  $files = drupal_system_listing('\.user_permission\.inc$', 'modules', 'name', 0);
+
+  foreach ($files as $file) {
+    $matches = array();
+    if (1 !== preg_match('/^(?<module>.*)\.user_permission\.inc$/', $file->basename, $matches)) {
+      continue;
+    }
+
+    $module = $matches['module'];
+    $function = $module . '_user_permissions';
+
+    if (FALSE === strpos($module, '.') && module_exists($module)) {
+      module_load_include('inc', $module, 'includes/'. $module .'.user_permission');
+
+      if (function_exists($function)) {
+        drupen_user_save_permissions_roles($function());
+      }
+    }
+  }
+}
