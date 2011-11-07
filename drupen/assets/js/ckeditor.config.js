@@ -9,22 +9,4 @@ CKEDITOR.editorConfig = function(config) {
   // switching from Source to WYSIWYG.
   config.protectedSource.push(/<\?[\s\S]*?\?>/g); // PHP Code
   config.protectedSource.push(/<code>[\s\S]*?<\/code>/gi); // Code tags
-
-  config.toolbar_Drupen = [
-    ['Maximize', 'ShowBlocks'],
-    ['Cut','Copy','Paste','PasteText','PasteFromWord','-'],
-    ['Undo','Redo','Find','Replace','-','SelectAll','RemoveFormat'],
-    '/',
-    ['Styles'],
-    ['TextColor','BGColor'],
-    ['Bold','Italic','Underline','Strike','-','Subscript','Superscript'],
-    ['NumberedList','BulletedList'],
-    ['JustifyLeft','JustifyCenter','JustifyRight','JustifyBlock','-','BidiRtl','BidiLtr','-','Outdent','Indent','Blockquote'],
-    '/',
-    ['MediaEmbed','Image','IMCE','Flash'],
-    ['Table','SpecialChar','HorizontalRule','Iframe'],
-    ['Link','Unlink','Anchor'],
-    ['DrupalBreak'],
-    ['Source']
-  ];
 };

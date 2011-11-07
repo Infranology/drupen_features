@@ -102,3 +102,48 @@ function drupen_install() {
   // Makes heavier since we change the default message for new installations.
   db_query("UPDATE {system} SET weight = 10 WHERE name = 'drupen'");
 }
+
+/**
+ * Update 6001: updates the CKEditor "Drupen" toolbar.
+ */
+function drupen_update_6001() {
+  module_load_include('inc', 'drupen', 'includes/drupen.ckeditor');
+
+  $settings_definitions = _drupen_ckeditor_settings_definitions();
+  $toolbar = $settings_definitions['Default']['toolbar'];
+
+  $result = db_query("SELECT * FROM {ckeditor_settings} WHERE name <> 'CKEditor Global Profile'");
+
+  $ret = array();
+  while (($profile = db_fetch_object($result))) {
+    $name = $profile->name;
+    $settings = unserialize($profile->settings);
+
+    // The ckeditor module is bootstrapped before the drupen module. Then it
+    // can unset the the "Drupen" toolbar. If the CKEditor profile is named
+    // "Default" and the toolbar is empty, will set the Drupen toolbar into it.
+    if (
+      'Drupen' === $settings['toolbar'] ||
+      ('Default' === $name && '' === $settings['toolbar'])
+    ) {
+      $settings['toolbar'] = $toolbar;
+      $settings = serialize($settings);
+
+      $return = db_query("UPDATE {ckeditor_settings} SET settings = '%s' WHERE name = '%s'", $settings, $name);
+
+      $ret[] = array(
+        'success' => $return !== FALSE,
+        'query'   => sprintf('Updated the CKEditor profile "%s" "Drupen" toolbar configuration.', $name)
+      );
+    }
+  }
+
+  if (0 === count($ret)) {
+    $ret[] = array(
+      'success' => FALSE,
+      'query'   => 'Could not find an eligible CKEditor profile to update the "Drupen" toolbar configuration. Please, update the toolbar manually.',
+    );
+  }
+
+  return $ret;
+}

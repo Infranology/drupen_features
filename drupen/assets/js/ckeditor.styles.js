@@ -1,13 +1,5 @@
 CKEDITOR.stylesSet.add('drupal',
 [
-  /* Block Styles */
-  { name : Drupal.t('Heading 1'), element: 'h1' },
-  { name : Drupal.t('Heading 2'), element: 'h2' },
-  { name : Drupal.t('Heading 3'), element: 'h3' },
-  { name : Drupal.t('Heading 4'), element: 'h4' },
-  { name : Drupal.t('Heading 5'), element: 'h5' },
-  { name : Drupal.t('Heading 6'), element: 'h6' },
-
   /* Inline Styles */
   { name : Drupal.t('Cited Work'), element : 'cite' },
   { name : Drupal.t('Computer Code'), element : 'code' },
