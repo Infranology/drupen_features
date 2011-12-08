@@ -35,3 +35,30 @@ function drupen_admin_install() {
   // See Views docs for more info in help/views/api-default-views.
   db_query("UPDATE {system} SET weight = 10 WHERE name = 'drupen_admin'");
 }
+
+/**
+ * Update 6001: updates the path to the Date Popup CSS file.
+ *
+ * This update is due the changed paths to the modules, themes and libraries
+ * directories from the 6.x-1.0 to the 6.x-1.1 version.
+ */
+function drupen_admin_update_6001() {
+  $variable = variable_get('date_popup_css_file', '');
+
+  if (1 === preg_match('@profiles/drupen/modules/contrib/date/date_popup/themes/datepicker\.css$@', $variable)) {
+    variable_set('date_popup_css_file', drupen_base_path() . drupal_get_path('module', 'date_popup') . '/themes/datepicker.css');
+
+    $success = TRUE;
+    $query = 'Updated the "%s" variable (to value: %s).';
+  } else {
+    $success = FALSE;
+    $query = 'Could not change the path for the variable "%s" (current value: ). Please, update it manually.';
+  }
+
+  return array(
+    array(
+      'success' => $success,
+      'query'   => sprintf($query, 'date_popup_css_file', variable_get('date_popup_css_file', ''))
+    )
+  );
+}

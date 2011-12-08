@@ -147,3 +147,141 @@ function drupen_update_6001() {
 
   return $ret;
 }
+
+/**
+ * Update 6002: updates paths configuration.
+ *
+ * This update is due the changed paths to the modules, themes and libraries
+ * directories from the 6.x-1.0 to the 6.x-1.1 version.
+ */
+function drupen_update_6002() {
+  $ret1 = _drupen_update_6002_ckeditor_update();
+  $ret2 = _drupen_update_6002_variable_update();
+
+  return array_merge($ret1, $ret2);
+}
+
+function _drupen_update_6002_ckeditor_update() {
+  module_load_include('inc', 'drupen', 'includes/drupen.ckeditor');
+  $settings_definitions = _drupen_ckeditor_settings_definitions();
+
+  $ckeditor_update_settings = array(
+    'CKEditor Global Profile' => array(
+      'ckeditor_path' => array(
+        'original' => '%b/profiles/drupen/libraries/ckeditor',
+        'update'   => '%b/' . libraries_get_path('ckeditor', FALSE)
+      ),
+    ),
+
+    'Default' => array(
+      'css_path' => array(
+        'original' => '%hprofiles/drupen/modules/drupen/drupen/assets/css/drupen-ckeditor.css',
+        'update'   => $settings_definitions['Default']['css_path'],
+      ),
+      'styles_path' => array(
+        'original' => '%hprofiles/drupen/modules/drupen/drupen/assets/js/ckeditor.styles.js',
+        'update'   => $settings_definitions['Default']['styles_path'],
+      ),
+      'config_js_path' => array(
+        'original' => '%hprofiles/drupen/modules/drupen/drupen/assets/js/ckeditor.config.js',
+        'update'   => $settings_definitions['Default']['config_js_path'],
+      ),
+
+      'loadPlugins' => array(
+        'ckeditor_link' => array(
+          'original' => array(
+            'name' => 'drupal_path',
+            'desc' => 'Support for CKEditor Link module',
+            'path' => '%base_path%profiles/drupen/modules/contrib/ckeditor_link/plugins/link/',
+            'default' => 't',
+          ),
+          'update' => $settings_definitions['Default']['loadPlugins']['ckeditor_link'],
+        ),
+        'ckeditor_swf' => array(
+          'original' => array(
+            'name' => 'swf',
+            'desc' => 'Support for CKEditor SWF module',
+            'path' => '%base_path%profiles/drupen/modules/contrib/ckeditor_swf/plugins/swf/',
+            'default' => 't',
+          ),
+          'update' => $settings_definitions['Default']['loadPlugins']['ckeditor_swf'],
+        ),
+      ),
+    ),
+  );
+
+  $result = db_query("SELECT * FROM {ckeditor_settings} WHERE name IN ('CKEditor Global Profile', 'Default')");
+
+  $ret = array();
+  while (($profile = db_fetch_object($result))) {
+    $name = $profile->name;
+    $settings = unserialize($profile->settings);
+
+    _drupen_update_6002_ckeditor_settings_update($settings, $ckeditor_update_settings[$name]);
+
+    $settings = serialize($settings);
+    $return = db_query("UPDATE {ckeditor_settings} SET settings = '%s' WHERE name = '%s'", $settings, $name);
+
+    $ret[] = array(
+      'success' => $return !== FALSE,
+      'query'   => sprintf('Updated CKEditor profile "%s" paths.', $name)
+    );
+  }
+
+  return $ret;
+}
+
+function _drupen_update_6002_ckeditor_settings_update(&$original_settings, $update_settings) {
+  foreach ($update_settings as $key => $value) {
+    if (
+      !array_key_exists('original', $value) &&
+      !array_key_exists('update', $value) &&
+      is_array($value)
+    ) {
+      _drupen_update_6002_ckeditor_settings_update($original_settings[$key], $value);
+      continue;
+    }
+
+    if ($original_settings[$key] === $value['original']) {
+      $original_settings[$key] = $value['update'];
+    }
+  }
+}
+
+function _drupen_update_6002_variable_update() {
+  $variables = array(
+    // drupen.ckeditor_swf.inc
+    'ckeditor_swf_players' => array(
+      'original' => array(
+        'audio/mpeg' => array(
+          'path'          => 'profiles/drupen/libraries/players/audio-player/player.swf',
+          'offsetHeight'  => 0,
+          'fileName'      => 'soundFile',
+          'defaultWidth'  => 290,
+          'defaultHeight' => 24,
+        ),
+      ),
+      'update'   => array(
+        'audio/mpeg' => array(
+          'path'          => libraries_get_path('players') . '/audio-player/player.swf',
+          'offsetHeight'  => 0,
+          'fileName'      => 'soundFile',
+          'defaultWidth'  => 290,
+          'defaultHeight' => 24,
+        ),
+      ),
+    ),
+    'getid3_path' => array(
+      'original' => 'profiles/drupen/libraries/getid3/getid3',
+      'update'   => libraries_get_path('getid3') . '/getid3',
+    ),
+
+    // drupen.service_links.inc
+    'service_links_path_icons' => array(
+      'original' => 'profiles/drupen/modules/contrib/service_links/images',
+      'update'   => drupal_get_path('module', 'service_links') . '/images',
+    ),
+  );
+
+  return drupen_variable_update($variables);
+}
