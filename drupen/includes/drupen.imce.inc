@@ -76,7 +76,7 @@ function _drupen_imce_configure(array $roles) {
       'rmdir' => 1,
     ),
     2 => array(
-      'name' => 'php: return \'uploads/users/\'.$user->name;',
+      'name' => 'uploads/shared',
       'subnav' => 1,
       'browse' => 1,
       'upload' => 1,
@@ -87,6 +87,17 @@ function _drupen_imce_configure(array $roles) {
       'rmdir' => 1,
     ),
     3 => array(
+      'name' => 'php: return \'uploads/users/\'.$user->name;',
+      'subnav' => 1,
+      'browse' => 1,
+      'upload' => 1,
+      'thumb' => 1,
+      'delete' => 1,
+      'resize' => 1,
+      'mkdir' => 1,
+      'rmdir' => 1,
+    ),
+    4 => array(
       'name' => 'imagecache',
       'subnav' => 1,
       'browse' => 1,
@@ -117,6 +128,17 @@ function _drupen_imce_configure(array $roles) {
       'rmdir' => 0,
     ),
     1 => array(
+      'name' => 'uploads',
+      'subnav' => 1,
+      'browse' => 1,
+      'upload' => 0,
+      'thumb' => 0,
+      'delete' => 0,
+      'resize' => 0,
+      'mkdir' => 0,
+      'rmdir' => 0,
+    ),
+    2 => array(
       'name' => 'uploads/shared',
       'subnav' => 1,
       'browse' => 1,
@@ -127,7 +149,7 @@ function _drupen_imce_configure(array $roles) {
       'mkdir' => 1,
       'rmdir' => 1,
     ),
-    2 => array(
+    3 => array(
       'name' => 'php: return \'uploads/users/\'.$user->name;',
       'subnav' => 1,
       'browse' => 1,
@@ -138,7 +160,7 @@ function _drupen_imce_configure(array $roles) {
       'mkdir' => 1,
       'rmdir' => 1,
     ),
-    3 => array(
+    4 => array(
       'name' => 'imagecache',
       'subnav' => 1,
       'browse' => 1,

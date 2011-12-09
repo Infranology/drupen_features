@@ -156,9 +156,10 @@ function drupen_update_6001() {
  */
 function drupen_update_6002() {
   $ret1 = _drupen_update_6002_ckeditor_update();
-  $ret2 = _drupen_update_6002_variable_update();
+  $ret2 = _drupen_update_6002_imce_update();
+  $ret3 = _drupen_update_6002_variable_update();
 
-  return array_merge($ret1, $ret2);
+  return array_merge($ret1, $ret2, $ret3);
 }
 
 function _drupen_update_6002_ckeditor_update() {
@@ -231,7 +232,7 @@ function _drupen_update_6002_ckeditor_update() {
   return $ret;
 }
 
-function _drupen_update_6002_ckeditor_settings_update(&$original_settings, $update_settings) {
+function _drupen_update_6002_ckeditor_settings_update(array &$original_settings, array $update_settings) {
   foreach ($update_settings as $key => $value) {
     if (
       !array_key_exists('original', $value) &&
@@ -246,6 +247,111 @@ function _drupen_update_6002_ckeditor_settings_update(&$original_settings, $upda
       $original_settings[$key] = $value['update'];
     }
   }
+}
+
+function _drupen_update_6002_imce_update() {
+  $imce_profiles = variable_get('imce_profiles', array());
+  $updated = array();
+
+  if (isset($imce_profiles[1]['name']) && 'Admin user' === $imce_profiles[1]['name']) {
+    $expected = array(
+      'uploads',
+      'php: return \'uploads/users/\'.$user->name;',
+      'imagecache'
+    );
+
+    $directory = array(
+      'name' => 'uploads/shared',
+      'subnav' => 1,
+      'browse' => 1,
+      'upload' => 1,
+      'thumb' => 1,
+      'delete' => 1,
+      'resize' => 1,
+      'mkdir' => 1,
+      'rmdir' => 1,
+    );
+
+    $updated[] = _drupen_update_6002_imce_directories_update(
+      $imce_profiles[1]['directories'], $expected, $directory, 'uploads'
+    );
+  }
+
+  if (isset($imce_profiles[2]['name']) && 'Authenticated user' === $imce_profiles[2]['name']) {
+    $expected = array(
+      'uploads/shared',
+      'php: return \'uploads/users/\'.$user->name;',
+      'imagecache'
+    );
+
+    $directory = array(
+      'name' => 'uploads',
+      'subnav' => 1,
+      'browse' => 1,
+      'upload' => 0,
+      'thumb' => 0,
+      'delete' => 0,
+      'resize' => 0,
+      'mkdir' => 0,
+      'rmdir' => 0,
+    );
+
+    $updated[] = _drupen_update_6002_imce_directories_update(
+      $imce_profiles[2]['directories'], $expected, $directory, 'private'
+    );
+  }
+
+  if (FALSE !== array_search(TRUE, $updated, TRUE)) {
+    variable_set('imce_profiles', $imce_profiles);
+
+    $success = TRUE;
+    $query   = 'Updated the IMCE profiles directories permissions.';
+  } else {
+    $success = FALSE;
+    $query   = 'Could not update the IMCE profiles directories permissions since they changed from the original configuration.';
+  }
+
+  return array(array(
+    'success' => $success,
+    'query'   => $query,
+  ));
+}
+
+function _drupen_update_6002_imce_directories_update(
+  array &$directories, array $expected, array $directory, $after = NULL
+) {
+  if (module_exists('private_download')) {
+    $expected = array_merge(
+      array(variable_get('private_download_directory', 'private')),
+      $expected
+    );
+  }
+
+  $check = array();
+  $position = NULL;
+  foreach ($directories as $key => $settings) {
+    $check[] = $settings['name'];
+
+    if ($after === $settings['name']) {
+      $position = $key;
+    }
+  }
+
+  if ($check === $expected) {
+    if (NULL === $position) {
+      array_unshift($directories, $directory);
+    } else {
+      $directories = array_merge(
+        array_slice($directories, 0, $position + 1),
+        array($directory),
+        array_slice($directories, $position + 1)
+      );
+    }
+
+    return TRUE;
+  }
+
+  return FALSE;
 }
 
 function _drupen_update_6002_variable_update() {
