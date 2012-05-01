@@ -1,7 +1,7 @@
 <?php
 
 // The Drüpen Features meta package version.
-define('DRUPEN_FEATURES_VERSION', '6.x-1.x');
+define('DRUPEN_FEATURES_VERSION', '6.x-1.2');
 
 // Localization server name.
 define('DRUPEN_L10N_SERVER_NAME', 'Translate Drüpen');
@@ -11,6 +11,13 @@ define('DRUPEN_L10N_SERVER_URL', 'http://translate.drupen.org/l10n_server.xml');
 
 // Release history (update status) URL.
 define('DRUPEN_RELEASE_HISTORY_URL', 'http://dev.infranology.com.br/fserver');
+
+/**
+ * Implementation of hook_l10n_update_projects_alter().
+ */
+function drupen_update_l10n_update_projects_alter(&$projects) {
+  drupen_update_update_projects_alter($projects);
+}
 
 /**
  * Implementation of hook_update_projects_alter().
